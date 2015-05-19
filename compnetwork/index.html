@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+	<title>NY Philharmonic Composer Co-Occurrence</title>
+<link href='http://fonts.googleapis.com/css?family=Open+Sans:400,600|Roboto:400,700,500' rel='stylesheet' type='text/css'>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="fuzzy/demo/css/prism.css">
+</head>
+<style>
+	
+
+svg {
+    background-color: #FFFDF1;
+    cursor: move;
+    margin:2em auto;
+}
+
+line.link {
+    stroke: #DED9CA;
+}
+
+circle {
+    cursor: crosshair;
+    fill:#657B83;
+    opacity:0.7;
+}
+
+
+
+circle.sibling {
+    /*fill: blue;*/
+    fill: #93A1A1; /* Old browsers */
+    opacity:1.0;
+    stroke:#57554F;
+}
+
+circle.main {
+    /*fill: red;*/
+    fill: #D50000	;
+    opacity: 1.0;
+}
+
+
+
+line.ontie{
+	stroke:#57554F;
+	stroke-width:2px;
+}
+
+/* ....................................................................... */
+/* Graph labels */
+
+g.gLabel {
+    font-size: 10px;
+    font-weight: normal;
+    visibility: hidden;
+}
+
+g.on {
+    visibility: visible;   
+}
+
+g.zoomed {
+    font-size: 11px;
+    font-weight: normal;
+    text-align: center;
+    color: #3E83AB;
+    border: none;
+    z-index: 0;
+}
+
+text {
+    font: 11px;
+    font-weight: normal;
+    stroke-opacity: 1.0;
+    font-weight: bold;
+        text-shadow:
+    -1px -1px 0 #FFFDF1,
+    1px -1px 0 #FFFDF1,
+    -1px 1px 0 #FFFDF1,
+    1px 1px 0 #FFFDF1; 
+}
+
+.label{
+	color:#3E83AB;
+}
+
+text.nlabel {
+    /*stroke: #000000;*/
+}
+
+text.nshadow {
+    stroke: #fff;
+    stroke-width: 1px;
+    /*stroke-opacity: 0.5;*/
+    /*visibility: hidden;*/
+}
+
+text.main {
+    font-size: 13px;
+    font-weight: bold;
+    fill:#403E3D;
+}
+</style>
+<body>
+
+	
+	<h1>Composers of a Feather, Philharmonic-ed Together</h1>
+	<p>This is a graph of the New York Philharmonic's top 250 most-played composers since 1842. The data are available <a href='https://github.com/nyphilarchive/PerformanceHistory/'>here</a>. A few notes:
+	
+	<ol>
+	<li> This is only the top 250 most commonly-played composers, because the &#8776;1300 unique composers the NYP have ever played gums up the algorithm.</li>
+		<li>A <strong>link/edge</strong> between two nodes means that works by those composers were played together in a performance.</li>
+	<li>For the same reason, the graph shows a maximum of 10 links per composer. For composers with more than 10 co-occurring composers, the graph displays links that composer's top 10 most commonly-occurring other composers. Just because one composer is in another composer's top 10 does not necessarily mean the reverse is true. </li>
+	<li>A circle's <strong>size</strong> represents how many times that composer's songs were played with other songs <i>by that composer</i>. So, composers with bigger circles usualy have several of their songs featured in the same performance.</li>
+</ol>
+
+	<p style='margin-top:1em;'>The graph can be dragged (click and drag), and zoomed (double-click to zoom in, shift-double-click to zoom out, or scroll on a multitouch pad). Thanks to <a href='https://github.com/paulovn/movie-network'>Paulo Villegas</a> for most of the code, and <a href='https://github.com/bripkens/fuzzy.js'>Ben Ripkens</a> for the fuzzy search matching.</p>
+	
+<br/>
+<h3>Search for a composer</h3>
+
+<div class="fuzzy-search-wrapper">
+          <div class="fuzzy-search">
+              <input type="text" class="search-query" autofocus="">
+           </div>
+           <ul>
+           </ul>
+</div>	
+          
+          
+<div id='erbox'></div>
+
+	        <script type="text/javascript" src="fuzzy/fuzzy.min.js"></script>
+        <script type="text/javascript" src="fuzzy/compfuzz.js"></script>
+        <script type="text/javascript" src="fuzzy/prism.js"></script>
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+
+<script> 
+	
+	var width = 1000,
+height = 800
+SHOW_THRESHOLD = 2.5;
+	
+	var selectMovie = undefined;
+
+// Change status of a panel from visible to hidden or viceversa
+var toggleDiv = undefined;
+
+// Clear all help boxes and select a movie in network and in movie details panel
+var clearAndSelect = undefined;
+
+
+// The call to set a zoom value -- currently unused
+// (zoom is set via standard mouse-based zooming)
+var zoomCall = undefined;
+
+function getViewportSize( w ) {
+    var w = w || window;
+    if( w.innerWidth != null ) 
+      return { w: w.innerWidth, 
+	       h: w.innerHeight,
+	       x : w.pageXOffset,
+	       y : w.pageYOffset };
+    var d = w.document;
+    if( document.compatMode == "CSS1Compat" )
+      return { w: d.documentElement.clientWidth,
+	       h: d.documentElement.clientHeight,
+	       x: d.documentElement.scrollLeft,
+	       y: d.documentElement.scrollTop };
+    else
+      return { w: d.body.clientWidth, 
+	       h: d.body.clientHeight,
+	       x: d.body.scrollLeft,
+	       y: d.body.scrollTop};
+  }
+
+
+
+  var activeMovie = undefined;
+  var currentOffset = { x : 0, y : 0 };
+  var currentZoom = 1.0;
+
+  // The D3.js scales
+  var xScale = d3.scale.linear()
+    .domain([0, width])
+    .range([0, width]);
+  var yScale = d3.scale.linear()
+    .domain([0, height])
+    .range([0, height]);
+  var zoomScale = d3.scale.linear()
+    .domain([1,6])
+    .range([1,6])
+    .clamp(true);
+    
+
+
+var force = d3.layout.force()
+.size([width, height])
+.linkDistance(150)
+.charge(-200)
+.gravity(0.1);
+
+
+
+
+var svg = d3.select("body").append("svg")
+.attr("width", width)
+.attr("height", height)
+.attr("id","graph")
+.attr("viewBox", "0 0 " + width + " " + height )
+.attr("preserveAspectRatio", "xMidYMid meet");
+
+
+
+d3.json('../data/composergraph.json', function(data) {
+
+
+var nodes = data.nodes;
+var	links = data.links;
+
+
+	      var minLinkWeight = 
+      Math.min.apply( null, links.map( function(n) {return n.weight;} ) );
+    var maxLinkWeight = 
+      Math.max.apply( null, links.map( function(n) {return n.weight;} ) );
+    console.log( "link weight = ["+minLinkWeight+","+maxLinkWeight+"]" );
+    
+    	      var minNodeEVC = 
+      Math.min.apply( null, nodes.map( function(n) {return n.loops;} ) );
+    var maxNodeEVC = 
+      Math.max.apply( null, nodes.map( function(n) {return n.loops;} ) );
+    console.log( "link weight = ["+minNodeEVC+","+maxNodeEVC+"]" );
+    
+
+ var edge_width = d3.scale.pow().exponent(8)
+      .domain( [minLinkWeight,maxLinkWeight] )
+      .range([1,6])
+      .clamp(true);
+      
+ var node_size = d3.scale.linear()
+      .domain([minNodeEVC,maxNodeEVC])
+      .range([4,9])
+      .clamp(true);
+
+
+
+
+ var xCal = function(l2,r){
+	 var cy =  l2.y - 400;
+	 var cx = l2.x - 500;
+	 var sc = (r+1)/(Math.sqrt(Math.pow(cx,2) + Math.pow(cy,2)))
+	 return cx * sc};
+	 
+ var yCal = function(l2,r){
+	 var cy =  l2.y - 400;
+	 var cx = l2.x - 500;
+	 var sc = (r+1)/(Math.sqrt(Math.pow(cx,2) + Math.pow(cy,2)))
+	 return cy * sc};
+
+
+ 
+
+
+force.nodes(nodes)
+	 .links(links)
+	 .start();
+
+
+
+    /* Add drag & zoom behaviours */
+    svg.call( d3.behavior.drag()
+	      .on("drag",dragmove) );
+    svg.call( d3.behavior.zoom()
+	      .x(xScale)
+	      .y(yScale)
+	      .scaleExtent([1, 6])
+	      .on("zoom", doZoom) );
+
+    
+var networkGraph = svg.append('g')
+	  .attr('class','grpParent');
+
+var graphLinks = networkGraph.append('g')
+	  .attr('class','grp gLinks')
+      .selectAll("line")
+      .data(links, function(d) {return d.source.index+'-'+d.target.index;} )
+      .enter().append("line")
+      .style('stroke-width', function(d) { return edge_width(d.weight);} )
+      .attr("class", "link")
+      .attr("id", function(d) {return "s" + d.source.index + ' t' + d.target.index;});
+
+
+var graphNodes = networkGraph.append('g').attr('class','grp gNodes')
+      .selectAll("circle")
+      .data(nodes)
+      .enter().append("circle")
+      .attr('id', function(d) {return "c" + d.compid; } )
+      .attr('r', function(d) { return node_size(d.loops);})
+      .attr('pointer-events', 'all')
+      //.on("click", function(d) { highlightGraphNode(d,true,this); } )    
+      .on("mouseover", function(d) { highlightGraphNode(d,true,this);  } )
+      .on("mouseout",  function(d) { highlightGraphNode(d,false,this); } );
+
+
+    var graphLabels = networkGraph.append('svg:g').attr('class','grp gLabel')
+      .selectAll("g.label")
+      .data(nodes)
+      .enter().append("svg:g")
+      .attr('id', function(d) { return "l" + d.compid; } )
+      .attr('class','label')
+      .attr('fill', '#403E3D');
+      
+	labels = graphLabels.append('svg:text')
+      .attr('dx', -3)
+      .attr('dy', -5 )
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none') // they go to the circle beneath
+      .attr('id', function(d) { return "lf" + d.compid; } )
+      .attr('class','nlabel')
+      .text( function(d) { return d.name; } );
+
+
+
+
+	  
+
+    /* --------------------------------------------------------------------- */
+    /* Select/unselect a node in the network graph.
+       Parameters are: 
+       - node: data for the node to be changed,  
+       - on: true/false to show/hide the node
+    */
+    function highlightGraphNode( node, on )
+    {
+      //if( d3.event.shiftKey ) on = false; // for debugging
+
+      // If we are to activate a movie, and there's already one active,
+      // first switch that one off
+      if( on && activeMovie !== undefined ) {
+	highlightGraphNode( nodes[activeMovie], false );
+      }
+
+      // locate the SVG nodes: circle & label group
+      circle = d3.select( '#c' + node.index );
+      label  = d3.select( '#l' + node.index );
+      ties  = d3.selectAll( '[id~=s' + node.index + ']' );
+
+      // activate/deactivate the node itself
+      circle
+	.classed( 'main', on );
+      label
+	.classed( 'on', on || currentZoom >= SHOW_THRESHOLD );
+      label.selectAll('text')
+	.classed( 'main', on );
+	ties.classed('ontie', on );
+	console.log('[id*=b' + node.index + ']');
+	console.log(ties);
+
+      // activate all siblings
+      Object(node.links).forEach( function(id) {
+	d3.select("#c"+id).classed( 'sibling', on );
+	label = d3.select('#l'+id);
+	label.classed( 'on', on || currentZoom >= SHOW_THRESHOLD );
+	label.selectAll('text.nlabel')
+	  .classed( 'sibling', on );
+      } );
+
+      // set the value for the current active movie
+      activeMovie = on ? node.index : undefined;
+    }
+	
+	    /* --------------------------------------------------------------------- */
+    /* Move all graph elements to its new positions. Triggered:
+       - on node repositioning (as result of a force-directed iteration)
+       - on translations (user is panning)
+       - on zoom changes (user is zooming)
+       - on explicit node highlight (user clicks in a movie panel link)
+       Set also the values keeping track of current offset & zoom values
+    */
+
+selectMovie = function( new_idx, doMoveTo ) {
+      console.log("SELECT", new_idx, doMoveTo );
+
+      // do we want to center the graph on the node?
+      doMoveTo = doMoveTo || false;
+      if( doMoveTo ) {
+	console.log("..POS: ", currentOffset.x, currentOffset.y, '->', 
+		    nodes[new_idx].x, nodes[new_idx].y );
+	s = getViewportSize();
+	width  = s.w<width ? s.w : width;
+	height = s.h<height ? s.h : height;
+	offset = { x : s.x + width/2  - nodes[new_idx].x*currentZoom,
+		   y : s.y + height/2 - nodes[new_idx].y*currentZoom };
+	repositionGraph( offset, undefined, 'move' );
+      }
+      // Now highlight the graph node and show its movie panel
+      highlightGraphNode( nodes[new_idx], true );
+    }
+
+function repositionGraph( off, z, mode ) {
+
+      // do we want to do a transition?
+      var doTr = (mode == 'move');
+
+      // drag: translate to new offset
+      if( off !== undefined &&
+	  (off.x != currentOffset.x || off.y != currentOffset.y ) ) {
+	g = d3.select('g.grpParent')
+	if( doTr )
+	  g = g.transition().duration(500);
+	g.attr("transform", function(d) { return "translate("+
+					  off.x+","+off.y+")" } );
+	currentOffset.x = off.x;
+	currentOffset.y = off.y;
+      }
+
+      // zoom: get new value of zoom
+      if( z === undefined ) {
+	if( mode != 'tick' )
+	  return;	// no zoom, no tick, we don't need to go further
+	z = currentZoom;
+      }
+      else
+	currentZoom = z;
+
+      // move edges
+      e = doTr ? graphLinks.transition().duration(500) : graphLinks;
+      e
+	    .attr("x1", function(d) { return z*(d.source.x); })
+        .attr("y1", function(d) { return z*(d.source.y); })
+        .attr("x2", function(d) { return z*(d.target.x); })
+        .attr("y2", function(d) { return z*(d.target.y); });
+
+      // move nodes
+      n = doTr ? graphNodes.transition().duration(500) : graphNodes;
+      n
+	.attr("transform", function(d) { return "translate("
+					 +z*d.x+","+z*d.y+")" } );
+      // move labels
+      l = doTr ? graphLabels.transition().duration(500) : graphLabels;
+      l
+	   .attr("transform", function(d) { return "translate("
+					 +z*d.x+","+z*d.y+")" } );
+    }
+           
+	
+	
+	    /* --------------------------------------------------------------------- */
+    /* Perform drag
+     */
+    function dragmove(d) {
+      offset = { x : currentOffset.x + d3.event.dx,
+		 y : currentOffset.y + d3.event.dy };
+      repositionGraph( offset, undefined, 'drag' );
+    }
+    
+    
+    compfind = function(linkname){
+		try {
+			
+	    	var thenode = nodes.filter(function (entry) { return entry.name === linkname; });
+			selectMovie( thenode[0].compid, false );
+			d3.select('.search-query').property('value','');
+			var erbox = d3.select('#erbox');
+			erbox.select('p').remove();
+	    } catch (error) {
+		    var erbox = d3.select('#erbox');
+			erbox.select('p').remove();
+			d3.select('#erbox').append('p').text("That particular composer does not appear on the Rap Airplay charts, sorry! Maybe try it with different capitalization?");
+			}
+		}
+
+
+    
+    
+        function doZoom( increment ) {
+      newZoom = increment === undefined ? d3.event.scale 
+					: zoomScale(currentZoom+increment);
+      if( currentZoom == newZoom )
+	return;	// no zoom change
+
+      // See if we cross the 'show' threshold in either direction
+      if( currentZoom<SHOW_THRESHOLD && newZoom>=SHOW_THRESHOLD )
+	svg.selectAll("g.label").classed('on',true);
+      else if( currentZoom>=SHOW_THRESHOLD && newZoom<SHOW_THRESHOLD )
+	svg.selectAll("g.label").classed('on',false);
+
+      // See what is the current graph window size
+      s = getViewportSize();
+      width  = s.w<width  ? s.w : width;
+      height = s.h<height ? s.h : height;
+
+      // Compute the new offset, so that the graph center does not move
+      zoomRatio = newZoom/currentZoom;
+      newOffset = { x : currentOffset.x*zoomRatio + width/2*(1-zoomRatio),
+		    y : currentOffset.y*zoomRatio + height/2*(1-zoomRatio) };
+
+      // Reposition the graph
+      repositionGraph( newOffset, newZoom, "zoom" );
+    }
+
+    zoomCall = doZoom;	// unused, so far
+    
+        force.on("tick", function() {
+      repositionGraph(undefined,undefined,'tick');
+    });
+    
+  
+    
+})
+</script>
+
+
+ </body>

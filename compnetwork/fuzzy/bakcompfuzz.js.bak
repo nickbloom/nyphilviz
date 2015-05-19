@@ -1,0 +1,96 @@
+(function() {
+  fuzzy.analyzeSubTerms = true;
+
+  var options = ["Aaron Copland","Johann Strauss Jr.","Ludwig van Beethoven","Modest Musorgsky","Nikolai Rimsky-Korsakov","Antonin Dvorak","Christoph Willibald Gluck","Anthem","Frederick Loewe","Gustav Mahler","Alban Berg","Charles Ives","Anton Bruckner","John Adams","William Schuman","George Frideric Handel","Georges Bizet","John Philip Sousa","Ruggero Leoncavallo","Johann Sebastian Bach","Johannes Brahms","Leonard Bernstein","Roy Harris","Dmitri Kabalevsky","Ferde Grofe","Gabriel Pierne","Jerome Kern","Maurice Ravel","Sergei Prokofiev","Cole Porter","George Gershwin","Traditional","Igor Stravinsky","Samuel Barber","Benjamin Britten","Henry Purcell","Gaetano Donizetti","Richard Wagner","Sergei Rachmaninoff","Anton von Webern","Bela Bartok","Claude Debussy","Morton Gould","Samuel Augustus Ward","Virgil Thomson","Carlos Chavez","Franz Joseph Haydn","Antonio Vivaldi","Walter Piston","Carl Maria Von Weber","Leos Janacek","Dmitri Shostakovich","John Corigliano Jr.","Mikhail Glinka","Hector Berlioz","Pyotr Ilyich Tchaikovsky","William Walton","Vincent d' Indy","Wolfgang Amadeus Mozart","Manuel de Falla","Unspecified","Ralph Vaughan Williams","Felix Mendelssohn","Giacomo Puccini","Aram Khachaturian","Leroy Anderson","Richard Rodgers","Richard Strauss","Robert Schumann","Gunther Schuller","Edward Kennedy \"Duke\" Ellington","Louis Moreau Gottschalk","Max Bruch","Alexander Glazunov","Gian Carlo Menotti","Reinhold Gliere","Gioachino Rossini","Arthur Honegger","Paul Hindemith","Joseph Turrin","Edward A. MacDowell","Stephen Collins Foster","Cesar Franck","Franz Schubert","Jean Sibelius","Edouard Lalo","Ernest Chausson","Georges Enesco","Karol Szymanowski","Albert Roussel","Frederic Chopin","Ernest Bloch","Alan Hovhaness","Paul Creston","Deems Taylor","Demonstration","Henri Vieuxtemps","Johann Christian Bach","Edvard Grieg","Ottorino Respighi","Christopher Rouse","Bedrich Smetana","Sir Edward Elgar","Camille Saint-Saens","Ned Rorem","Alberto Ginastera","Alexander Borodin","Kurt Weill","Franz Liszt","Isaac Albeniz","Johann Hummel","Emmanuel Chabrier","Edgard Varese","Arnold Schoenberg","Heitor Villa-Lobos","Jacques Offenbach","Emil Nikolaus von Reznicek","Andre  Ernest Modeste Gretry","Elliott Carter","Emmerich Kalman","Henry F. Gilbert","Josef & Johann Strauss Jr.","Giuseppe Verdi","Sigmund Romberg","Bohuslav Martinu","Gabriel-Urbain Faure","Zoltan Kodaly","Jules Massenet","Giovanni Gabrieli","Frederick Delius","Darius Milhaud","Paul Dukas","Anatoli Lyadov","Leone Sinigaglia","Percy Grainger","Amilcare Ponchielli","Lukas Foss","Johann Strauss Sr.","Erich Korngold","Franz Von Suppe","Victor Herbert","Jaromir Weinberger","Lew Pollack","Franz Lehar","Ermanno Wolf-Ferrari","Domenico Cimarosa","Patty and Mildred Hill","Arkady Dubensky","David Diamond","Francis Poulenc","Arcangelo Corelli","Irving Berlin","Nicolo Paganini","Charles Martin Loeffler","Erno Dohnanyi","John Alden Carpenter","Franz Xaver Gruber","Rudolph Ganz","Charles Tomlinson Griffes","Otto Nicolai","Adolphe Charles Adam","Frank Loesser","Marvin Hamlisch","Claudio Monteverdi","Charles Gounod","Enrique Granados","Alexander Gretchaninoff","Benjamin Godard","Leo Delibes","Georg Philipp Telemann","Olivier Messiaen","Luigi Cherubini","Joaquin Turina","Jean-Philippe Rameau","Carl Nielsen","Erik Satie","Henry Kimball Hadley","Alfredo Casella","Alexander Scriabin","Karl Goldmark","Ernest Schelling","Henri Rabaud","Alexandre Tansman","Vincenzo Bellini","Ernesto Lecuona","Pablo de Sarasate","William Grant Still","Stephen Sondheim","Max Reger","Rubin Goldmark","Mikhail Ippolitov-Ivanov","Alphonse Charles Renaud de Vilbac","Henri Wieniawski","Luigi Boccherini","Fritz Kreisler","Ilderbando Pizzetti","Anton Rubinstein","Eugene Goossens","Engelbert Humperdinck","Moritz Moszkowski","Ambroise Thomas","Gustave Charpentier","Dimitri Tiomkin","Emil Waldteufel","Rudolf Sieczynski","Ignacy Jan Paderewski","Johan Svendsen","Giacomo Meyerbeer","Gustav Holst","Gyorgy Ligeti","Jacques Ibert","Alfred Schnittke","Sir Arnold Bax","Giuseppe Martucci","Francesco Cilea","Walter Damrosch","Josef Strauss","Joachim Raff","Henri Duparc","Pietro Mascagni","Edward MacDowell","Daniel Gregory Mason","Arthur Seymour Sullivan","George Whitefield Chadwick","Sofia Gubaidulina","Francois  Couperin","John Williams","Magnus Lindberg","Jacob Druckman","Sir Charles Villiers Stanford","Bernard Herrmann","Louis Spohr","Henry Charles Litolff","Leopold Damrosch","Niels Gade","Pierre Boulez","Luciano Berio","Krzysztof Penderecki","Hugo Wolf","Henri Dutilleux","Ellen Taaffe Zwilich","Ferruccio Busoni","Howard Hanson","Robert Stolz","Josef Stransky","Tylman Susato","Witold Lutoslawski","Nikos Skalkottas","Gerry Mulligan","Roger Machado"],
+    maxResults = 5,
+    input = document.querySelector('.fuzzy-search-wrapper input');
+    output = document.querySelector('.fuzzy-search-wrapper ul'),
+    demoItemOutput = document.getElementById('demoItems');
+
+
+  function doFilterOptions() {
+    var query = input.value,
+      filterResult = [],
+      i;
+
+    // removing all child elements the easy way
+    output.innerHTML = '';
+
+    if (query === '') {
+      return;
+    }
+
+    for (i = 0; i < options.length; i++) {
+      filterResult[i] = fuzzy(options[i], query);
+    }
+
+    filterResult.sort(fuzzy.matchComparator);
+
+    for (i = 0; i < filterResult.length && i < maxResults; i++) {
+      var option = filterResult[i],
+        el = document.createElement('li');
+
+      el.dataset.score = option.score;
+      el.dataset.term = option.term;
+      el.innerHTML = option.highlightedTerm;
+
+      if (i === 0) {
+        el.classList.add('selected');
+      }
+
+      output.appendChild(el);
+    }
+  };
+
+  function getSelectedNode() {
+    return document.querySelector('.selected');
+  };
+
+  function useSelectedOption() {
+    var selectedNode = getSelectedNode();
+    if (selectedNode !== null) {
+      input.value = selectedNode.dataset.term;
+    }
+  };
+
+  function moveSelection(down) {
+    var selectedNode = getSelectedNode(),
+      newSelectedNode = null;
+
+    if (down) {
+      newSelectedNode = selectedNode.nextSibling;
+    } else {
+      newSelectedNode = selectedNode.previousSibling;
+    }
+
+    if (newSelectedNode !== null) {
+      selectedNode.classList.remove('selected');
+      newSelectedNode.classList.add('selected');
+    }
+  };
+
+  input.addEventListener('keyup', function(e) {
+    if (e.keyCode === 13) { // enter
+      useSelectedOption();
+      doFilterOptions();
+    } else if (e.keyCode === 40) { // down
+      moveSelection(true);
+    } else if (e.keyCode === 38) { // up
+      moveSelection(false);
+    } else if (e.keyCode === 27) { // ESC
+      output.innerHTML = '';
+      input.value = '';
+    } else {
+      doFilterOptions();
+    }
+  }, false);
+  
+   for (var i = 0; i < options.length; i++) {
+    var textNode = document.createTextNode(options[i]),
+      liNode = document.createElement('li');
+    liNode.appendChild(textNode);
+    demoItemOutput.appendChild(liNode);
+  }
+
+})();
+

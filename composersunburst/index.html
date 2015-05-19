@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+  <title>Which Instruments Do Composers Write Solos For?</title>
+        <script type="text/javascript" src="sjs/autosuggest.js"></script>
+        <script type="text/javascript" src="sjs/artistlist.js"></script>
+        <script type="text/javascript">
+            window.onload = function () {
+                var oTextbox = new AutoSuggestControl(document.getElementById("txt1"), new StateSuggestions());        
+            }
+        </script>
+        <script src="//use.typekit.net/lio8cna.js"></script>
+<script>try{Typekit.load();}catch(e){}</script>
+</head>
+<style>
+body{
+  font-family:'proxima-nova';
+  text-align:center;
+  color:#555;
+  background-color:#FFF;
+}
+
+h1{
+    font-family: 'proxima-nova-sc-osf';
+    text-align:center;
+    margin-top:1em;
+    font-size:24pt;
+    font-weight:300;
+    text-transform: lowercase;
+}
+
+h3{
+  text-align: center;
+  font-family:'proxima-nova-sc-osf';
+  font-weight:300;
+  text-transform: lowercase;
+}
+
+p{
+  margin-bottom:3em;
+  font-size:12pt;
+  width:80%;
+  text-align:center;
+  margin:0px auto;
+  font-family:"ff-tisa-web-pro";
+}
+
+a{
+  color:#448C61;
+}
+
+
+path {
+  stroke: #fff;
+  fill-rule: evenodd;
+}
+
+text {
+  font-family: 'proxima-nova', sans-serif;
+  font-weight:600;
+  font-size: 10px;
+}
+
+svg{
+  margin-top:3em;
+}
+
+</style>
+<body>
+
+  <h1>Which Instruments Do Composers Write Solos For?</h1>
+  <p> Below is a <a href='http://mbostock.github.io/protovis/ex/sunburst.html'>sunburst partition</a> of the 25 most-played composers by the <a href='https://github.com/nyphilarchive/PerformanceHistory/'>New York Philharmonic</a>. The second rung of the sunburst contains the instruments that are most often featured with solos by those composers (up to 10 each). For example, Beethoven and Mozart most often write solos for Piano, but Wagner most often writes solos for a Soprano singer. You can click on a composer's slice to zoom in to that composer. When you're zoomed in on a composer, click the circle in the center to zoom back out.</p>
+<script src="../js/d3.v3.js"></script>
+<script>
+
+var width = 960,
+    height = 700,
+    radius = Math.min(width, height) / 2.1;
+
+var x = d3.scale.linear()
+    .range([0, 2 * Math.PI]);
+
+var y = d3.scale.linear()
+    .range([0, radius]);
+
+var color = d3.scale.category20c();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height)
+  .append("g")
+    .attr("transform", "translate(" + width / 2 + "," + (height / 2 + 10) + ")");
+
+var partition = d3.layout.partition()
+    .value(function(d) { return d.size; });
+
+var arc = d3.svg.arc()
+    .startAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x))); })
+    .endAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x + d.dx))); })
+    .innerRadius(function(d) { return Math.max(0, y(d.y)); })
+    .outerRadius(function(d) { return Math.max(0, y(d.y + d.dy)); });
+
+d3.json("../data/compins.json", function(error, root) {
+  var g = svg.selectAll("g")
+      .data(partition.nodes(root))
+    .enter().append("g");
+
+  var path = g.append("path")
+    .attr("d", arc)
+    .style("fill", function(d) { return color((d.children ? d : d.parent).name); })
+    .on("click", click);
+
+  var text = g.append("text")
+    .attr("transform", function(d) { return "rotate(" + computeTextRotation(d) + ")"; })
+    .attr("x", function(d) { return y(d.y); })
+    .attr("dx", "2") // margin
+    .attr("dy", ".35em") // vertical-align
+    .text(function(d) { return d.name; });
+
+  function click(d) {
+    // fade out all text elements
+    text.transition().attr("opacity", 0);
+
+    path.transition()
+      .duration(750)
+      .attrTween("d", arcTween(d))
+      .each("end", function(e, i) {
+          // check if the animated element's data e lies within the visible angle span given in d
+          if (e.x >= d.x && e.x < (d.x + d.dx)) {
+            // get a selection of the associated text element
+            var arcText = d3.select(this.parentNode).select("text");
+            // fade in the text element and recalculate positions
+            arcText.transition().duration(750)
+              .attr("opacity", 1)
+              .attr("transform", function() { return "rotate(" + computeTextRotation(e) + ")" })
+              .attr("x", function(d) { return y(d.y); });
+          }
+      });
+  }
+});
+
+d3.select(self.frameElement).style("height", height + "px");
+
+// Interpolate the scales!
+function arcTween(d) {
+  var xd = d3.interpolate(x.domain(), [d.x, d.x + d.dx]),
+      yd = d3.interpolate(y.domain(), [d.y, 1]),
+      yr = d3.interpolate(y.range(), [d.y ? 20 : 0, radius]);
+  return function(d, i) {
+    return i
+        ? function(t) { return arc(d); }
+        : function(t) { x.domain(xd(t)); y.domain(yd(t)).range(yr(t)); return arc(d); };
+  };
+}
+
+function computeTextRotation(d) {
+  return (x(d.x + d.dx / 2) - Math.PI / 2) / Math.PI * 180;
+}
+
+</script>
